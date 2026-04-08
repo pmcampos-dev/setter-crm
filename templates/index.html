@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Setter - Closers Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://sdk.twilio.com/js/client/releases/1.14/twilio.min.js"></script>
+    <style>
+        .status-nuevo { background-color: #dbeafe; color: #1e40af; }
+        .status-contactado { background-color: #d1fae5; color: #065f46; }
+        .status-no-contesto { background-color: #fef3c7; color: #92400e; }
+        .status-interesado { background-color: #ede9fe; color: #5b21b6; }
+        .status-cerrado { background-color: #d1fae5; color: #065f46; }
+        .status-perdido { background-color: #fee2e2; color: #991b1b; }
+        .call-active { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            50% { box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <h1 class="text-xl font-bold text-gray-900">Setter CRM</h1>
+            <div class="flex items-center gap-4">
+                <div id="device-status" class="flex items-center gap-2 text-sm text-gray-500">
+                    <span id="status-dot" class="w-2 h-2 rounded-full bg-gray-400"></span>
+                    <span id="status-text">Conectando...</span>
+                </div>
+                <button onclick="openAddLeadModal()" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700">
+                    + Lead Manual
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 py-6 flex gap-6">
+
+        <!-- Left Panel: Lead List -->
+        <div class="w-1/3 flex flex-col gap-4">
+            <!-- Filters -->
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="filterLeads('todos')" class="filter-btn px-3 py-1 rounded-full text-xs font-medium bg-gray-900 text-white" data-filter="todos">Todos</button>
+                <button onclick="filterLeads('nuevo')" class="filter-btn px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600" data-filter="nuevo">Nuevos</button>
+                <button onclick="filterLeads('contactado')" class="filter-btn px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600" data-filter="contactado">Contactados</button>
+                <button onclick="filterLeads('no contestó')" class="filter-btn px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600" data-filter="no contestó">No contestó</button>
+                <button onclick="filterLeads('interesado')" class="filter-btn px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600" data-filter="interesado">Interesados</button>
+            </div>
+
+            <!-- Lead Cards -->
+            <div id="leads-list" class="flex flex-col gap-2 overflow-y-auto" style="max-height: calc(100vh - 180px);">
+                <p class="text-gray-400 text-sm text-center py-8">Cargando leads...</p>
+            </div>
+        </div>
+
+        <!-- Right Panel: Lead Detail -->
+        <div class="w-2/3">
+            <div id="lead-detail" class="bg-white rounded-xl border border-gray-200 p-6" style="min-height: calc(100vh - 180px);">
+                <div class="flex items-center justify-center h-full text-gray-400 text-sm" style="min-height: 400px;">
+                    Selecciona un lead para ver los detalles
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call Bar (fixed bottom, shown during active call) -->
+    <div id="call-bar" class="fixed bottom-0 left-0 right-0 bg-green-600 text-white py-3 px-6 flex items-center justify-between hidden z-50">
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-3 bg-white rounded-full call-active"></div>
+            <span id="call-bar-name" class="font-medium">Llamando...</span>
+            <span id="call-bar-timer" class="text-green-100">00:00</span>
+        </div>
+        <button onclick="hangUp()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium">
+            Colgar
+        </button>
+    </div>
+
+    <!-- Add Lead Modal -->
+    <div id="add-lead-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 class="text-lg font-bold mb-4">Agregar Lead Manual</h3>
+            <form onsubmit="submitNewLead(event)">
+                <div class="flex flex-col gap-3">
+                    <input id="new-lead-name" type="text" placeholder="Nombre completo" required class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <input id="new-lead-phone" type="tel" placeholder="Teléfono (ej: +521234567890)" required class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <input id="new-lead-email" type="email" placeholder="Email (opcional)" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <select id="new-lead-country" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="México">México</option>
+                        <option value="España">España</option>
+                        <option value="Colombia">Colombia</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" onclick="closeAddLeadModal()" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancelar</button>
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
