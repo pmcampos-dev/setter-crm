@@ -37,6 +37,17 @@ def init_db():
             FOREIGN KEY (lead_id) REFERENCES leads(id)
         );
 
+        CREATE TABLE IF NOT EXISTS sms (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            lead_id INTEGER NOT NULL,
+            direction TEXT DEFAULT 'outbound',
+            body TEXT NOT NULL,
+            twilio_sid TEXT,
+            status TEXT DEFAULT 'sent',
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (lead_id) REFERENCES leads(id)
+        );
+
         CREATE TABLE IF NOT EXISTS notes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             lead_id INTEGER NOT NULL,
@@ -121,6 +132,29 @@ def get_calls_for_lead(lead_id):
     conn = get_db()
     rows = conn.execute(
         "SELECT * FROM calls WHERE lead_id = ? ORDER BY created_at DESC", (lead_id,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+# --- SMS ---
+
+def create_sms(lead_id, body, direction='outbound', twilio_sid=None, status='sent'):
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO sms (lead_id, body, direction, twilio_sid, status) VALUES (?, ?, ?, ?, ?)",
+        (lead_id, body, direction, twilio_sid, status)
+    )
+    conn.commit()
+    sms_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.close()
+    return sms_id
+
+
+def get_sms_for_lead(lead_id):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM sms WHERE lead_id = ? ORDER BY created_at DESC", (lead_id,)
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]

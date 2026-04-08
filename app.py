@@ -83,6 +83,7 @@ def api_lead(lead_id):
     if not lead:
         return jsonify({'error': 'not found'}), 404
     lead['calls'] = models.get_calls_for_lead(lead_id)
+    lead['sms'] = models.get_sms_for_lead(lead_id)
     lead['notes'] = models.get_notes_for_lead(lead_id)
     return jsonify(lead)
 
@@ -173,6 +174,35 @@ def api_log_call():
 def api_calls(lead_id):
     calls = models.get_calls_for_lead(lead_id)
     return jsonify(calls)
+
+
+# --- API: SMS ---
+
+@app.route('/api/leads/<int:lead_id>/sms', methods=['POST'])
+def api_send_sms(lead_id):
+    lead = models.get_lead(lead_id)
+    if not lead:
+        return jsonify({'error': 'lead not found'}), 404
+    if not lead.get('phone'):
+        return jsonify({'error': 'lead has no phone number'}), 400
+
+    data = request.get_json()
+    body = data.get('body', '').strip()
+    if not body:
+        return jsonify({'error': 'body required'}), 400
+
+    try:
+        twilio_sid, status = twilio_service.send_sms(lead['phone'], body)
+        sms_id = models.create_sms(lead_id, body, twilio_sid=twilio_sid, status=status)
+        return jsonify({'status': 'sent', 'sms_id': sms_id, 'twilio_sid': twilio_sid})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/leads/<int:lead_id>/sms', methods=['GET'])
+def api_get_sms(lead_id):
+    messages = models.get_sms_for_lead(lead_id)
+    return jsonify(messages)
 
 
 # --- API: Notes ---

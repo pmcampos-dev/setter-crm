@@ -270,6 +270,18 @@ function renderLeadDetail(lead) {
         </div>`;
     }).join('') || '<p class="text-gray-400 text-sm">Sin llamadas registradas</p>';
 
+    const smsHtml = (lead.sms || []).map(sms => {
+        const date = formatDate(sms.created_at);
+        const icon = sms.direction === 'outbound' ? '→' : '←';
+        return `<div class="bg-blue-50 rounded-lg p-2 text-sm">
+            <div class="flex items-center gap-1 mb-1">
+                <span class="text-blue-600 font-medium text-xs">${icon} ${sms.direction === 'outbound' ? 'Enviado' : 'Recibido'}</span>
+                <span class="text-gray-400 text-xs">- ${date}</span>
+            </div>
+            <p class="text-gray-700">${escapeHtml(sms.body)}</p>
+        </div>`;
+    }).join('') || '';
+
     const notesHtml = (lead.notes || []).map(note => {
         return `<div class="bg-gray-50 rounded-lg p-2 text-sm">
             <p class="text-gray-700">${escapeHtml(note.text)}</p>
@@ -320,6 +332,21 @@ function renderLeadDetail(lead) {
             ${callsHtml}
         </div>
 
+        <!-- SMS -->
+        <div class="mb-6">
+            <h3 class="text-sm font-semibold text-gray-700 mb-2">SMS</h3>
+            ${lead.phone ? `
+                <div class="flex gap-2 mb-3">
+                    <input id="sms-input" type="text" placeholder="Escribir mensaje..." class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                           onkeydown="if(event.key==='Enter')sendSms(${lead.id})">
+                    <button onclick="sendSms(${lead.id})" class="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Enviar</button>
+                </div>
+            ` : '<p class="text-gray-400 text-sm mb-3">Sin teléfono para enviar SMS</p>'}
+            <div class="flex flex-col gap-2">
+                ${smsHtml}
+            </div>
+        </div>
+
         <!-- Notes -->
         <div>
             <h3 class="text-sm font-semibold text-gray-700 mb-2">Notas</h3>
@@ -363,6 +390,38 @@ async function addNote(leadId) {
         showLeadDetail(leadId);
     } catch (err) {
         console.error('Error adding note:', err);
+    }
+}
+
+// --- SMS ---
+async function sendSms(leadId) {
+    const input = document.getElementById('sms-input');
+    const body = input.value.trim();
+    if (!body) return;
+
+    const btn = input.nextElementSibling;
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+
+    try {
+        const res = await fetch(`/api/leads/${leadId}/sms`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ body }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            alert('Error al enviar SMS: ' + (data.error || 'Error desconocido'));
+        } else {
+            input.value = '';
+            showLeadDetail(leadId);
+        }
+    } catch (err) {
+        console.error('Error sending SMS:', err);
+        alert('Error al enviar SMS');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Enviar';
     }
 }
 

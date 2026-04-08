@@ -2,6 +2,7 @@ import os
 from twilio.jwt.access_token import AccessToken
 from twilio.jwt.access_token.grants import VoiceGrant
 from twilio.twiml.voice_response import VoiceResponse
+from twilio.rest import Client
 
 
 ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
@@ -12,6 +13,14 @@ API_KEY_SID = os.environ.get('TWILIO_API_KEY_SID')
 API_KEY_SECRET = os.environ.get('TWILIO_API_KEY_SECRET')
 
 IDENTITY = 'setter'
+
+_client = None
+
+def get_twilio_client():
+    global _client
+    if _client is None:
+        _client = Client(ACCOUNT_SID, AUTH_TOKEN)
+    return _client
 
 
 def generate_access_token():
@@ -34,3 +43,13 @@ def build_twiml_dial(to_number):
     dial = response.dial(caller_id=TWILIO_PHONE_NUMBER)
     dial.number(to_number)
     return str(response)
+
+
+def send_sms(to_number, body):
+    client = get_twilio_client()
+    message = client.messages.create(
+        body=body,
+        from_=TWILIO_PHONE_NUMBER,
+        to=to_number,
+    )
+    return message.sid, message.status
