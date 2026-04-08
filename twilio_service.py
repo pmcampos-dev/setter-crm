@@ -19,7 +19,7 @@ _client = None
 def get_twilio_client():
     global _client
     if _client is None:
-        _client = Client(ACCOUNT_SID, AUTH_TOKEN)
+        _client = Client(API_KEY_SID, API_KEY_SECRET, ACCOUNT_SID)
     return _client
 
 
