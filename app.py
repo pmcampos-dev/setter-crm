@@ -205,6 +205,23 @@ def api_get_sms(lead_id):
     return jsonify(messages)
 
 
+# --- Webhook: Incoming SMS ---
+
+@app.route('/webhooks/sms', methods=['POST'])
+def webhook_incoming_sms():
+    from_number = request.form.get('From', '')
+    body = request.form.get('Body', '').strip()
+    message_sid = request.form.get('MessageSid', '')
+
+    if from_number and body:
+        lead = models.find_lead_by_phone(from_number)
+        if lead:
+            models.create_sms(lead['id'], body, direction='inbound', twilio_sid=message_sid, status='received')
+
+    # Respond with empty TwiML (no auto-reply)
+    return Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', mimetype='text/xml')
+
+
 # --- API: Notes ---
 
 @app.route('/api/leads/<int:lead_id>/notes', methods=['POST'])

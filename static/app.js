@@ -270,15 +270,15 @@ function renderLeadDetail(lead) {
         </div>`;
     }).join('') || '<p class="text-gray-400 text-sm">Sin llamadas registradas</p>';
 
-    const smsHtml = (lead.sms || []).map(sms => {
+    const smsMessages = (lead.sms || []).slice().reverse(); // Chronological order
+    const smsHtml = smsMessages.map(sms => {
         const date = formatDate(sms.created_at);
-        const icon = sms.direction === 'outbound' ? '→' : '←';
-        return `<div class="bg-blue-50 rounded-lg p-2 text-sm">
-            <div class="flex items-center gap-1 mb-1">
-                <span class="text-blue-600 font-medium text-xs">${icon} ${sms.direction === 'outbound' ? 'Enviado' : 'Recibido'}</span>
-                <span class="text-gray-400 text-xs">- ${date}</span>
+        const isOutbound = sms.direction === 'outbound';
+        return `<div class="flex ${isOutbound ? 'justify-end' : 'justify-start'}">
+            <div class="${isOutbound ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'} rounded-2xl px-3 py-2 max-w-[75%] text-sm">
+                <p>${escapeHtml(sms.body)}</p>
+                <p class="${isOutbound ? 'text-blue-200' : 'text-gray-400'} text-xs mt-1">${date}</p>
             </div>
-            <p class="text-gray-700">${escapeHtml(sms.body)}</p>
         </div>`;
     }).join('') || '';
 
@@ -332,18 +332,20 @@ function renderLeadDetail(lead) {
             ${callsHtml}
         </div>
 
-        <!-- SMS -->
+        <!-- SMS Chat -->
         <div class="mb-6">
             <h3 class="text-sm font-semibold text-gray-700 mb-2">SMS</h3>
-            ${lead.phone ? `
-                <div class="flex gap-2 mb-3">
-                    <input id="sms-input" type="text" placeholder="Escribir mensaje..." class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                           onkeydown="if(event.key==='Enter')sendSms(${lead.id})">
-                    <button onclick="sendSms(${lead.id})" class="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Enviar</button>
+            <div class="border border-gray-200 rounded-lg overflow-hidden">
+                <div class="bg-gray-50 p-3 flex flex-col gap-2 max-h-64 overflow-y-auto" id="sms-chat">
+                    ${smsHtml || '<p class="text-gray-400 text-sm text-center py-4">Sin mensajes</p>'}
                 </div>
-            ` : '<p class="text-gray-400 text-sm mb-3">Sin teléfono para enviar SMS</p>'}
-            <div class="flex flex-col gap-2">
-                ${smsHtml}
+                ${lead.phone ? `
+                    <div class="flex gap-2 p-2 border-t border-gray-200 bg-white">
+                        <input id="sms-input" type="text" placeholder="Escribir mensaje..." class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                               onkeydown="if(event.key==='Enter')sendSms(${lead.id})">
+                        <button onclick="sendSms(${lead.id})" class="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Enviar</button>
+                    </div>
+                ` : ''}
             </div>
         </div>
 

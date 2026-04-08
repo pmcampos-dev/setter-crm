@@ -97,6 +97,23 @@ def get_lead(lead_id):
     return dict(row) if row else None
 
 
+def find_lead_by_phone(phone):
+    conn = get_db()
+    # Try exact match first, then try matching last 10 digits
+    row = conn.execute("SELECT * FROM leads WHERE phone = ?", (phone,)).fetchone()
+    if not row:
+        # Match by last 10 digits (handles +52 vs +521 formatting differences)
+        digits = ''.join(c for c in phone if c.isdigit())[-10:]
+        rows = conn.execute("SELECT * FROM leads").fetchall()
+        for r in rows:
+            lead_digits = ''.join(c for c in (r['phone'] or '') if c.isdigit())[-10:]
+            if lead_digits == digits and digits:
+                row = r
+                break
+    conn.close()
+    return dict(row) if row else None
+
+
 def update_lead_status(lead_id, status):
     conn = get_db()
     conn.execute("UPDATE leads SET status = ? WHERE id = ?", (status, lead_id))
