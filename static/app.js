@@ -18,26 +18,49 @@ async function initTwilioDevice() {
         const res = await fetch('/api/token', { method: 'POST' });
         const data = await res.json();
 
-        device = new Twilio.Device(data.token, {
-            codecPreferences: [Twilio.Device.Codec.Opus, Twilio.Device.Codec.PCMU],
-            edge: 'ashburn',
-        });
+        if (!data.token) {
+            console.error('No token received:', data);
+            updateDeviceStatus('error');
+            return;
+        }
+
+        console.log('Token received, initializing device...');
+
+        const options = { edge: 'ashburn' };
+
+        // Codec preferences - only add if available in this SDK version
+        if (Twilio.Device.Codec) {
+            options.codecPreferences = [Twilio.Device.Codec.Opus, Twilio.Device.Codec.PCMU];
+        }
+
+        device = new Twilio.Device(data.token, options);
 
         device.on('registered', () => {
+            console.log('Twilio device registered successfully');
             updateDeviceStatus('ready');
         });
 
         device.on('error', (error) => {
-            console.error('Twilio error:', error);
+            console.error('Twilio device error:', error.message || error);
             updateDeviceStatus('error');
         });
 
         device.on('unregistered', () => {
+            console.log('Twilio device unregistered');
             updateDeviceStatus('offline');
             setTimeout(initTwilioDevice, 5000);
         });
 
+        device.on('tokenWillExpire', () => {
+            console.log('Token expiring, refreshing...');
+            fetch('/api/token', { method: 'POST' })
+                .then(r => r.json())
+                .then(d => device.updateToken(d.token))
+                .catch(e => console.error('Token refresh failed:', e));
+        });
+
         await device.register();
+        console.log('device.register() called');
 
     } catch (err) {
         console.error('Failed to init Twilio:', err);
