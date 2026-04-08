@@ -19,11 +19,11 @@ async function initTwilioDevice() {
         const data = await res.json();
 
         device = new Twilio.Device(data.token, {
-            codecPreferences: ['opus', 'pcmu'],
+            codecPreferences: [Twilio.Device.Codec.Opus, Twilio.Device.Codec.PCMU],
             edge: 'ashburn',
         });
 
-        device.on('ready', () => {
+        device.on('registered', () => {
             updateDeviceStatus('ready');
         });
 
@@ -32,23 +32,12 @@ async function initTwilioDevice() {
             updateDeviceStatus('error');
         });
 
-        device.on('connect', (conn) => {
-            activeConnection = conn;
-            showCallBar(true);
-            startCallTimer();
-        });
-
-        device.on('disconnect', () => {
-            activeConnection = null;
-            showCallBar(false);
-            stopCallTimer();
-        });
-
-        device.on('offline', () => {
+        device.on('unregistered', () => {
             updateDeviceStatus('offline');
-            // Reconnect after a delay
             setTimeout(initTwilioDevice, 5000);
         });
+
+        await device.register();
 
     } catch (err) {
         console.error('Failed to init Twilio:', err);
@@ -98,17 +87,34 @@ async function callLead(leadId, phone, name) {
     currentLeadId = leadId;
     document.getElementById('call-bar-name').textContent = `Llamando a ${name}...`;
 
-    const params = { To: phone };
-    device.connect(params);
+    try {
+        const call = await device.connect({ params: { To: phone } });
+        activeConnection = call;
+        showCallBar(true);
+        startCallTimer();
+
+        call.on('disconnect', () => {
+            activeConnection = null;
+            showCallBar(false);
+            stopCallTimer();
+        });
+
+        call.on('cancel', () => {
+            activeConnection = null;
+            showCallBar(false);
+            stopCallTimer();
+        });
+    } catch (err) {
+        console.error('Call failed:', err);
+        alert('Error al realizar la llamada: ' + err.message);
+    }
 }
 
 function hangUp() {
     if (activeConnection) {
         activeConnection.disconnect();
     }
-    if (device) {
-        device.disconnectAll();
-    }
+    device?.disconnectAll();
 }
 
 function showCallBar(show) {
