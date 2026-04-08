@@ -5,11 +5,18 @@ let currentLeadId = null;
 let currentFilter = 'todos';
 let callTimer = null;
 let callSeconds = 0;
+let refreshInterval = null;
 
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
     loadLeads();
     initTwilioDevice();
+    // Auto-refresh: poll for new messages every 10 seconds
+    refreshInterval = setInterval(() => {
+        if (currentLeadId) {
+            showLeadDetail(currentLeadId);
+        }
+    }, 10000);
 });
 
 // --- Twilio Device ---
