@@ -123,9 +123,17 @@ async function callLead(leadId, phone, name) {
         showCallBar(true);
         startCallTimer();
 
+        // Capture the Twilio Call SID for recording association
+        call.on('accept', () => {
+            if (call.parameters && call.parameters.CallSid) {
+                activeConnection._callSid = call.parameters.CallSid;
+            }
+        });
+
         call.on('disconnect', () => {
+            const callSid = activeConnection?._callSid || '';
             activeConnection = null;
-            showCallBar(false);
+            showCallBar(false, callSid);
             stopCallTimer();
         });
 
@@ -147,7 +155,7 @@ function hangUp() {
     device?.disconnectAll();
 }
 
-function showCallBar(show) {
+function showCallBar(show, callSid) {
     const bar = document.getElementById('call-bar');
     if (show) {
         bar.classList.remove('hidden');
@@ -155,9 +163,9 @@ function showCallBar(show) {
         bar.classList.add('hidden');
         // Log call when it ends
         if (currentLeadId && callSeconds > 0) {
-            logCall(currentLeadId, callSeconds, 'completed');
+            logCall(currentLeadId, callSeconds, 'completed', callSid);
         } else if (currentLeadId) {
-            logCall(currentLeadId, 0, 'no-answer');
+            logCall(currentLeadId, 0, 'no-answer', callSid);
         }
     }
 }
@@ -184,7 +192,7 @@ function updateTimerDisplay() {
     document.getElementById('call-bar-timer').textContent = `${mins}:${secs}`;
 }
 
-async function logCall(leadId, duration, status) {
+async function logCall(leadId, duration, status, callSid) {
     try {
         await fetch('/api/calls/log', {
             method: 'POST',
@@ -193,6 +201,7 @@ async function logCall(leadId, duration, status) {
                 lead_id: leadId,
                 duration: duration,
                 status: status,
+                call_sid: callSid || '',
             }),
         });
         // Refresh lead detail and list
@@ -271,8 +280,17 @@ function renderLeadDetail(lead) {
         const date = formatDate(call.created_at);
         const icon = call.status === 'completed' ? '✓' : '✗';
         const color = call.status === 'completed' ? 'text-green-600' : 'text-red-500';
+        const recordingBtn = call.recording_url
+            ? `<button onclick="playRecording('${call.recording_url}')" class="text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1">
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"/></svg>
+                Escuchar
+               </button>`
+            : '';
         return `<div class="flex items-center justify-between text-sm py-1.5 border-b border-gray-50">
-            <span class="${color} font-medium">${icon} ${call.status === 'completed' ? 'Contestó' : 'No contestó'}</span>
+            <div class="flex items-center gap-2">
+                <span class="${color} font-medium">${icon} ${call.status === 'completed' ? 'Contestó' : 'No contestó'}</span>
+                ${recordingBtn}
+            </div>
             <span class="text-gray-400">${dur} - ${date}</span>
         </div>`;
     }).join('') || '<p class="text-gray-400 text-sm">Sin llamadas registradas</p>';
@@ -400,6 +418,28 @@ async function addNote(leadId) {
     } catch (err) {
         console.error('Error adding note:', err);
     }
+}
+
+// --- Recording Playback ---
+function playRecording(url) {
+    // Route through our proxy since Twilio recordings need auth
+    // url is like https://api.twilio.com/2010-04-01/Accounts/.../Recordings/RE...
+    const path = url.replace('https://api.twilio.com/', '');
+    const audioUrl = '/api/recording/' + path;
+    let player = document.getElementById('audio-player');
+    if (!player) {
+        player = document.createElement('div');
+        player.id = 'audio-player';
+        player.className = 'fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 py-2 px-6 flex items-center gap-3 z-50 shadow-lg';
+        document.body.appendChild(player);
+    }
+    player.innerHTML = `
+        <span class="text-sm font-medium text-gray-700">Grabación:</span>
+        <audio controls autoplay class="flex-1 h-8">
+            <source src="${audioUrl}" type="audio/mpeg">
+        </audio>
+        <button onclick="document.getElementById('audio-player').remove()" class="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+    `;
 }
 
 // --- SMS ---

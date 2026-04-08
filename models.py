@@ -33,6 +33,8 @@ def init_db():
             duration INTEGER DEFAULT 0,
             status TEXT DEFAULT 'initiated',
             twilio_call_sid TEXT,
+            recording_url TEXT,
+            recording_duration INTEGER,
             created_at TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (lead_id) REFERENCES leads(id)
         );
@@ -141,6 +143,16 @@ def update_call(call_id, duration=None, status=None):
         conn.execute("UPDATE calls SET duration = ? WHERE id = ?", (duration, call_id))
     if status is not None:
         conn.execute("UPDATE calls SET status = ? WHERE id = ?", (status, call_id))
+    conn.commit()
+    conn.close()
+
+
+def update_call_recording(call_sid, recording_url, recording_duration=None):
+    conn = get_db()
+    conn.execute(
+        "UPDATE calls SET recording_url = ?, recording_duration = ? WHERE twilio_call_sid = ?",
+        (recording_url, recording_duration, call_sid)
+    )
     conn.commit()
     conn.close()
 

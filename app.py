@@ -136,7 +136,8 @@ def api_voice():
         to_number = request.values.get('To', '')
 
     if to_number:
-        twiml = twilio_service.build_twiml_dial(to_number)
+        callback_url = request.url_root.rstrip('/') + '/webhooks/recording'
+        twiml = twilio_service.build_twiml_dial(to_number, recording_callback_url=callback_url)
     else:
         from twilio.twiml.voice_response import VoiceResponse
         response = VoiceResponse()
@@ -144,6 +145,38 @@ def api_voice():
         twiml = str(response)
 
     return Response(twiml, mimetype='text/xml')
+
+
+# --- Webhook: Recording Complete ---
+
+@app.route('/webhooks/recording', methods=['POST'])
+def webhook_recording():
+    call_sid = request.form.get('CallSid', '')
+    recording_url = request.form.get('RecordingUrl', '')
+    recording_duration = request.form.get('RecordingDuration', 0)
+
+    try:
+        recording_duration = int(recording_duration)
+    except (ValueError, TypeError):
+        recording_duration = 0
+
+    if call_sid and recording_url:
+        models.update_call_recording(call_sid, recording_url, recording_duration)
+
+    return jsonify({'status': 'received'})
+
+
+# --- API: Recording Proxy (Twilio recordings need auth) ---
+
+@app.route('/api/recording/<path:recording_path>', methods=['GET'])
+def api_recording_proxy(recording_path):
+    import requests
+    twilio_url = f'https://api.twilio.com/{recording_path}.mp3'
+    r = requests.get(twilio_url, auth=(
+        os.environ.get('TWILIO_API_KEY_SID'),
+        os.environ.get('TWILIO_API_KEY_SECRET'),
+    ), stream=True)
+    return Response(r.content, mimetype='audio/mpeg')
 
 
 # --- API: Call Logging ---

@@ -38,9 +38,15 @@ def generate_access_token():
     return token.to_jwt()
 
 
-def build_twiml_dial(to_number):
+def build_twiml_dial(to_number, recording_callback_url=None):
     response = VoiceResponse()
-    dial = response.dial(caller_id=TWILIO_PHONE_NUMBER)
+    dial = response.dial(
+        caller_id=TWILIO_PHONE_NUMBER,
+        record='record-from-answer-dual',
+        recording_status_callback=recording_callback_url,
+        recording_status_callback_method='POST',
+        recording_status_callback_event='completed',
+    )
     dial.number(to_number)
     return str(response)
 
