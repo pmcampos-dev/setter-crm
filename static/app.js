@@ -346,6 +346,12 @@ async function showLeadDetail(leadId) {
     currentLeadId = leadId;
     loadLeads(); // Refresh to highlight active
 
+    // Mobile: show detail panel as overlay
+    const panel = document.getElementById('lead-detail-panel');
+    if (panel && window.innerWidth < 768) {
+        panel.classList.add('mobile-show');
+    }
+
     try {
         const res = await fetch(`/api/leads/${leadId}`);
         const lead = await res.json();
@@ -353,6 +359,12 @@ async function showLeadDetail(leadId) {
     } catch (err) {
         console.error('Error loading lead detail:', err);
     }
+}
+
+function mobileBack() {
+    const panel = document.getElementById('lead-detail-panel');
+    if (panel) panel.classList.remove('mobile-show');
+    currentLeadId = null;
 }
 
 function renderLeadDetail(lead) {
@@ -400,6 +412,11 @@ function renderLeadDetail(lead) {
     }).join('') || '';
 
     container.innerHTML = `
+        <!-- Mobile back button -->
+        <button onclick="mobileBack()" class="md:hidden flex items-center gap-1 text-blue-600 text-sm font-medium mb-4">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Volver a leads
+        </button>
         <div class="flex items-start justify-between mb-6">
             <div>
                 <h2 class="text-xl font-bold text-gray-900">${escapeHtml(lead.name)}</h2>
