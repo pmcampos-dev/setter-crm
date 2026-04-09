@@ -17,6 +17,25 @@ document.addEventListener('DOMContentLoaded', () => {
             showLeadDetail(currentLeadId);
         }
     }, 10000);
+
+    // Safari audio fix: unlock AudioContext on first user interaction
+    const unlockAudio = () => {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') {
+            ctx.resume();
+        }
+        // Also create and play a silent buffer to unlock audio playback
+        const buffer = ctx.createBuffer(1, 1, 22050);
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(ctx.destination);
+        source.start(0);
+        console.log('Audio unlocked for Safari');
+        document.removeEventListener('touchstart', unlockAudio);
+        document.removeEventListener('click', unlockAudio);
+    };
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('click', unlockAudio, { once: true });
 });
 
 // --- Twilio Device ---
@@ -169,6 +188,8 @@ function hideIncomingCallUI() {
 
 function acceptIncomingCall() {
     hideIncomingCallUI();
+    // Ensure audio is unlocked (Safari fix)
+    ensureAudioEnabled();
     if (activeConnection) {
         activeConnection.accept();
         const callSid = activeConnection.parameters?.CallSid || '';
@@ -187,6 +208,27 @@ function rejectIncomingCall() {
     }
 }
 
+// --- Safari Audio Helper ---
+function ensureAudioEnabled() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') ctx.resume();
+        // Play silent buffer
+        const buffer = ctx.createBuffer(1, 1, 22050);
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(ctx.destination);
+        source.start(0);
+    } catch(e) {}
+
+    // Also try to set Twilio audio output device
+    if (device && device.audio) {
+        try {
+            device.audio.speakerDevices.set('default');
+        } catch(e) {}
+    }
+}
+
 // --- Calling ---
 async function callLead(leadId, phone, name) {
     if (!device) {
@@ -201,6 +243,9 @@ async function callLead(leadId, phone, name) {
 
     currentLeadId = leadId;
     document.getElementById('call-bar-name').textContent = `Llamando a ${name}...`;
+
+    // Ensure audio is unlocked (Safari fix)
+    ensureAudioEnabled();
 
     try {
         const call = await device.connect({ params: { To: phone } });
