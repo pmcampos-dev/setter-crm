@@ -33,9 +33,12 @@ def calendly_webhook():
     if event == 'invitee.created':
         payload = data.get('payload', {})
 
-        # Solo procesar eventos de tipo "auditoria"
+        # Solo procesar eventos de tipo "auditoría/auditoria"
+        import unicodedata
         event_name = payload.get('scheduled_event', {}).get('name', '')
-        if 'auditoria' not in event_name.lower():
+        event_name_normalized = unicodedata.normalize('NFD', event_name.lower())
+        event_name_normalized = ''.join(c for c in event_name_normalized if unicodedata.category(c) != 'Mn')
+        if 'auditoria' not in event_name_normalized:
             return jsonify({'status': 'ignored', 'reason': 'not auditoria event'}), 200
 
         name = payload.get('name', 'Sin nombre')
