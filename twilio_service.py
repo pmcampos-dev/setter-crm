@@ -51,6 +51,18 @@ def build_twiml_dial(to_number, recording_callback_url=None):
     return str(response)
 
 
+def get_recording_for_call(call_sid):
+    """Fetch recording URL from Twilio API for a given call SID."""
+    client = get_twilio_client()
+    recordings = client.recordings.list(call_sid=call_sid, limit=1)
+    if recordings:
+        rec = recordings[0]
+        url = f'https://api.twilio.com/2010-04-01/Accounts/{ACCOUNT_SID}/Recordings/{rec.sid}'
+        duration = int(rec.duration) if rec.duration else 0
+        return url, duration
+    return None, None
+
+
 def send_sms(to_number, body):
     client = get_twilio_client()
     message = client.messages.create(

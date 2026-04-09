@@ -82,7 +82,19 @@ def api_lead(lead_id):
     lead = models.get_lead(lead_id)
     if not lead:
         return jsonify({'error': 'not found'}), 404
-    lead['calls'] = models.get_calls_for_lead(lead_id)
+    calls = models.get_calls_for_lead(lead_id)
+    # Fetch recording URLs from Twilio for calls missing them
+    for call in calls:
+        if call.get('twilio_call_sid') and not call.get('recording_url'):
+            try:
+                rec_url, rec_dur = twilio_service.get_recording_for_call(call['twilio_call_sid'])
+                if rec_url:
+                    models.update_call_recording(call['twilio_call_sid'], rec_url, rec_dur)
+                    call['recording_url'] = rec_url
+                    call['recording_duration'] = rec_dur
+            except Exception:
+                pass
+    lead['calls'] = calls
     lead['sms'] = models.get_sms_for_lead(lead_id)
     lead['notes'] = models.get_notes_for_lead(lead_id)
     return jsonify(lead)
