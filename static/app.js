@@ -191,7 +191,43 @@ function acceptIncomingCall() {
     // Ensure audio is unlocked (Safari fix)
     ensureAudioEnabled();
     if (activeConnection) {
-        activeConnection.accept();
+        // Accept with explicit audio constraints for Safari
+        activeConnection.accept({
+            rtcConstraints: {
+                audio: true
+            }
+        });
+
+        // Safari: ensure remote audio plays through speaker
+        activeConnection.on('volume', () => {});  // force audio stream attachment
+
+        // Fallback: manually attach audio stream if needed (Safari WebRTC fix)
+        setTimeout(() => {
+            try {
+                const pc = activeConnection._mediaHandler?._peerConnection
+                    || activeConnection._mediaHandler?.pstream?.transport?.pcStream;
+                if (pc) {
+                    const receivers = pc.getReceivers();
+                    if (receivers.length > 0) {
+                        const remoteStream = new MediaStream(receivers.map(r => r.track).filter(Boolean));
+                        let audioEl = document.getElementById('remote-audio');
+                        if (!audioEl) {
+                            audioEl = document.createElement('audio');
+                            audioEl.id = 'remote-audio';
+                            audioEl.autoplay = true;
+                            audioEl.playsInline = true;
+                            document.body.appendChild(audioEl);
+                        }
+                        audioEl.srcObject = remoteStream;
+                        audioEl.play().catch(() => {});
+                        console.log('Remote audio stream manually attached');
+                    }
+                }
+            } catch(e) {
+                console.log('Manual audio attach not needed:', e.message);
+            }
+        }, 1000);
+
         const callSid = activeConnection.parameters?.CallSid || '';
         activeConnection._callSid = callSid;
         document.getElementById('call-bar-name').textContent = `Llamada entrante: ${activeConnection.parameters?.From || 'Desconocido'}`;

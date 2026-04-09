@@ -181,15 +181,20 @@ def api_voice():
             models.create_call(lead['id'], call_sid)
 
         response = VoiceResponse()
+        twilio_number = os.environ.get('TWILIO_PHONE_NUMBER', '')
         dial = response.dial(
-            caller_id=from_number,
+            caller_id=twilio_number,
             record='record-from-answer-dual',
             recording_status_callback=callback_url,
             recording_status_callback_method='POST',
             recording_status_callback_event='completed',
             timeout=30,
+            answer_on_bridge=True,
         )
-        dial.client('setter')
+        dial.client(
+            'setter',
+            status_callback_event='initiated ringing answered completed',
+        )
         return Response(str(response), mimetype='text/xml')
 
 
