@@ -18,6 +18,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 10000);
 
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+        // Show a button to request permission (Safari requires user gesture)
+        const permBtn = document.createElement('button');
+        permBtn.textContent = '🔔 Activar notificaciones';
+        permBtn.className = 'fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg z-50 hover:bg-blue-700';
+        permBtn.onclick = () => {
+            Notification.requestPermission().then(perm => {
+                console.log('Notification permission:', perm);
+                permBtn.remove();
+            });
+        };
+        document.body.appendChild(permBtn);
+    }
+
     // Safari audio fix: unlock AudioContext on first user interaction
     const unlockAudio = () => {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -144,6 +159,25 @@ function updateDeviceStatus(status) {
 let incomingRingtone = null;
 
 function showIncomingCallUI(fromNumber) {
+    // Browser notification (works even if tab is in background)
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const notif = new Notification('📞 Llamada entrante', {
+            body: `Llamada de ${fromNumber}`,
+            icon: '/static/icon-192.png',
+            tag: 'incoming-call',
+            requireInteraction: true,
+            vibrate: [300, 100, 300, 100, 300],
+        });
+        notif.onclick = () => {
+            window.focus();
+            notif.close();
+        };
+        // Close notification when call is answered or rejected
+        setTimeout(() => {
+            if (!document.getElementById('incoming-call-banner')) notif.close();
+        }, 60000);
+    }
+
     // Play ringtone
     try {
         incomingRingtone = new Audio('https://cdn.pixabay.com/audio/2022/10/01/audio_0f0b1e1a6e.mp3');
@@ -184,6 +218,10 @@ function hideIncomingCallUI() {
     }
     const banner = document.getElementById('incoming-call-banner');
     if (banner) banner.remove();
+    // Close browser notification
+    if ('Notification' in window) {
+        try { navigator.serviceWorker?.ready?.then(r => r.getNotifications({ tag: 'incoming-call' }).then(n => n.forEach(x => x.close()))); } catch(e) {}
+    }
 }
 
 function acceptIncomingCall() {
