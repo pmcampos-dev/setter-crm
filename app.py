@@ -32,6 +32,12 @@ def calendly_webhook():
 
     if event == 'invitee.created':
         payload = data.get('payload', {})
+
+        # Solo procesar eventos de tipo "auditoria"
+        event_name = payload.get('scheduled_event', {}).get('name', '')
+        if 'auditoria' not in event_name.lower():
+            return jsonify({'status': 'ignored', 'reason': 'not auditoria event'}), 200
+
         name = payload.get('name', 'Sin nombre')
         email = payload.get('email', '')
         phone = ''
