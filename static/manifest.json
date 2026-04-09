@@ -1,7 +1,7 @@
 {
-  "name": "Setter CRM",
-  "short_name": "SetterCRM",
-  "description": "CRM para setters - Llamadas, SMS y seguimiento de leads",
+  "name": "Vantage Calls",
+  "short_name": "Vantage",
+  "description": "Llamadas, SMS y seguimiento de leads",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f9fafb",
