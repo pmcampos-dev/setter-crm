@@ -152,15 +152,39 @@ def api_token():
 
 @app.route('/api/voice', methods=['POST'])
 def api_voice():
-    to_number = request.form.get('To', '')
-    if not to_number:
-        to_number = request.values.get('To', '')
+    from twilio.twiml.voice_response import VoiceResponse
 
+    to_number = request.form.get('To', '') or request.values.get('To', '')
+    from_number = request.form.get('From', '') or request.values.get('From', '')
+    direction = request.form.get('Direction', '') or request.values.get('Direction', '')
+    call_sid = request.form.get('CallSid', '')
+
+    callback_url = request.url_root.rstrip('/') + '/webhooks/recording'
+
+    # Llamada ENTRANTE: alguien marcó al número de Twilio → conectar al setter en el navegador
+    twilio_number = os.environ.get('TWILIO_PHONE_NUMBER', '')
+    if direction == 'inbound' or (to_number == twilio_number and not to_number.startswith('client:')):
+        # Log the incoming call and try to find the lead
+        lead = models.find_lead_by_phone(from_number)
+        if lead:
+            models.create_call(lead['id'], call_sid)
+
+        response = VoiceResponse()
+        dial = response.dial(
+            caller_id=from_number,
+            record='record-from-answer-dual',
+            recording_status_callback=callback_url,
+            recording_status_callback_method='POST',
+            recording_status_callback_event='completed',
+            timeout=30,
+        )
+        dial.client('setter')
+        return Response(str(response), mimetype='text/xml')
+
+    # Llamada SALIENTE: setter llama a un lead desde el navegador
     if to_number:
-        callback_url = request.url_root.rstrip('/') + '/webhooks/recording'
         twiml = twilio_service.build_twiml_dial(to_number, recording_callback_url=callback_url)
     else:
-        from twilio.twiml.voice_response import VoiceResponse
         response = VoiceResponse()
         response.say('No se proporcionó un número para marcar.', language='es-MX')
         twiml = str(response)

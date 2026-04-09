@@ -52,6 +52,25 @@ async function initTwilioDevice() {
             updateDeviceStatus('error');
         });
 
+        device.on('incoming', (call) => {
+            console.log('Incoming call from:', call.parameters.From);
+            activeConnection = call;
+            showIncomingCallUI(call.parameters.From);
+
+            call.on('cancel', () => {
+                hideIncomingCallUI();
+                activeConnection = null;
+            });
+
+            call.on('disconnect', () => {
+                const callSid = activeConnection?._callSid || call.parameters.CallSid || '';
+                activeConnection = null;
+                showCallBar(false, callSid);
+                stopCallTimer();
+                hideIncomingCallUI();
+            });
+        });
+
         device.on('unregistered', () => {
             console.log('Twilio device unregistered');
             updateDeviceStatus('offline');
@@ -99,6 +118,72 @@ function updateDeviceStatus(status) {
             dot.className = 'w-2 h-2 rounded-full bg-yellow-400';
             text.textContent = 'Conectando...';
             text.className = 'text-sm text-yellow-600';
+    }
+}
+
+// --- Incoming Call UI ---
+let incomingRingtone = null;
+
+function showIncomingCallUI(fromNumber) {
+    // Play ringtone
+    try {
+        incomingRingtone = new Audio('https://cdn.pixabay.com/audio/2022/10/01/audio_0f0b1e1a6e.mp3');
+        incomingRingtone.loop = true;
+        incomingRingtone.play().catch(() => {});
+    } catch(e) {}
+
+    let banner = document.getElementById('incoming-call-banner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'incoming-call-banner';
+        document.body.appendChild(banner);
+    }
+    banner.className = 'fixed top-0 left-0 right-0 bg-green-600 text-white py-4 px-6 flex items-center justify-between z-[100] shadow-xl animate-pulse';
+    banner.innerHTML = `
+        <div class="flex items-center gap-3">
+            <svg class="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+            <div>
+                <p class="font-bold text-lg">📞 Llamada entrante</p>
+                <p class="text-green-100">${escapeHtml(fromNumber)}</p>
+            </div>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="acceptIncomingCall()" class="bg-white text-green-700 font-bold px-6 py-2 rounded-lg hover:bg-green-50 flex items-center gap-2">
+                ✓ Contestar
+            </button>
+            <button onclick="rejectIncomingCall()" class="bg-red-500 text-white font-bold px-6 py-2 rounded-lg hover:bg-red-600 flex items-center gap-2">
+                ✗ Rechazar
+            </button>
+        </div>
+    `;
+}
+
+function hideIncomingCallUI() {
+    if (incomingRingtone) {
+        incomingRingtone.pause();
+        incomingRingtone = null;
+    }
+    const banner = document.getElementById('incoming-call-banner');
+    if (banner) banner.remove();
+}
+
+function acceptIncomingCall() {
+    hideIncomingCallUI();
+    if (activeConnection) {
+        activeConnection.accept();
+        const callSid = activeConnection.parameters?.CallSid || '';
+        activeConnection._callSid = callSid;
+        document.getElementById('call-bar-name').textContent = `Llamada entrante: ${activeConnection.parameters?.From || 'Desconocido'}`;
+        showCallBar(true);
+        startCallTimer();
+    }
+}
+
+function rejectIncomingCall() {
+    hideIncomingCallUI();
+    if (activeConnection) {
+        activeConnection.reject();
+        activeConnection = null;
     }
 }
 
