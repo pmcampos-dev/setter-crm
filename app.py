@@ -161,10 +161,21 @@ def api_voice():
 
     callback_url = request.url_root.rstrip('/') + '/webhooks/recording'
 
-    # Llamada ENTRANTE: alguien marcó al número de Twilio → conectar al setter en el navegador
-    twilio_number = os.environ.get('TWILIO_PHONE_NUMBER', '')
-    if direction == 'inbound' or (to_number == twilio_number and not to_number.startswith('client:')):
-        # Log the incoming call and try to find the lead
+    # Distinguir: browser SDK manda From=client:setter, teléfono real manda From=+52...
+    is_from_browser = from_number.startswith('client:')
+
+    if is_from_browser:
+        # SALIENTE: setter llama a un lead desde el navegador
+        if to_number:
+            twiml = twilio_service.build_twiml_dial(to_number, recording_callback_url=callback_url)
+        else:
+            response = VoiceResponse()
+            response.say('No se proporcionó un número para marcar.', language='es-MX')
+            twiml = str(response)
+        return Response(twiml, mimetype='text/xml')
+
+    else:
+        # ENTRANTE: un lead marcó al número de Twilio → conectar al setter en el navegador
         lead = models.find_lead_by_phone(from_number)
         if lead:
             models.create_call(lead['id'], call_sid)
@@ -180,16 +191,6 @@ def api_voice():
         )
         dial.client('setter')
         return Response(str(response), mimetype='text/xml')
-
-    # Llamada SALIENTE: setter llama a un lead desde el navegador
-    if to_number:
-        twiml = twilio_service.build_twiml_dial(to_number, recording_callback_url=callback_url)
-    else:
-        response = VoiceResponse()
-        response.say('No se proporcionó un número para marcar.', language='es-MX')
-        twiml = str(response)
-
-    return Response(twiml, mimetype='text/xml')
 
 
 # --- Webhook: Recording Complete ---
