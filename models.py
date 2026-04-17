@@ -86,11 +86,11 @@ def get_leads(status=None):
     conn = get_db()
     if status and status != 'todos':
         rows = conn.execute(
-            "SELECT * FROM leads ORDER BY scheduled_at DESC",
+            "SELECT * FROM leads ORDER BY created_at DESC",
         ).fetchall()
         rows = [r for r in rows if r['status'] == status]
     else:
-        rows = conn.execute("SELECT * FROM leads ORDER BY scheduled_at DESC").fetchall()
+        rows = conn.execute("SELECT * FROM leads ORDER BY created_at DESC").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
